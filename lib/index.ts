@@ -72,33 +72,30 @@ export const init = (config: Config) => {
   const supabase = createClient(apiUrl, apiKey, options);
 
   return {
-    upload: (file: TFile, customParams = {}) =>
-      new Promise((resolve, reject) => {
-        //--- Compute the file key.
-        file.hash = crypto.createHash("md5").update(file.hash).digest("hex");
-        //--- Upload the file into storage
-        supabase.storage
-          .from(bucket)
-          .upload(
-            getKey({ directory, file }),
-            // file, // or Buffer.from(file.buffer, "binary"),
-            Buffer.from(file.buffer, "binary"), // or file
-            {
-              cacheControl: "public, max-age=31536000, immutable",
-              upsert: true,
-              contentType: file.mime,
-            }
-          )
-          .then(({ data, error: error1 }) => {
-            if (error1) return reject(error1);
-            const { publicURL, error: error2 } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(getKey({ directory, file }));
-            if (error2) return reject(error2);
-            file.url = publicURL;
-            resolve(undefined);
-          });
-      }),
+    upload: async (file: TFile, customParams = {}) => {
+      //--- Upload the file into storage
+      const { data, error: error1 } = await supabase.storage
+        .from(bucket)
+        .upload(
+          getKey({ directory, file }),
+          // file, // or Buffer.from(file.buffer, "binary"),
+          Buffer.from(file.buffer, "binary"), // or file
+          {
+            cacheControl: "public, max-age=31536000, immutable",
+            upsert: true,
+            contentType: file.mime,
+          }
+        );
+
+      if (error1) throw error1;
+
+      const { publicURL, error: error2 } = await supabase.storage
+        .from(bucket)
+        .getPublicUrl(getKey({ directory, file }));
+
+      if (error2) throw error2;
+      file.url = publicURL;
+    },
 
     delete: (file: TFile, customParams = {}) =>
       new Promise((resolve, reject) => {
