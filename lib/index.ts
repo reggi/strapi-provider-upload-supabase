@@ -32,7 +32,7 @@ const getKey = ({ directory, file }: { directory: string; file: TFile }) => {
   );
 };
 
-export default {
+const config = {
   provider: "supabase",
   name: "Supabase Storage",
   auth: {
@@ -59,56 +59,57 @@ export default {
       type: "object",
     },
   },
-  init: (config: Config) => {
-    const apiUrl = config.apiUrl;
-    const apiKey = config.apiKey;
+};
 
-    const bucket = config.bucket || "strapi-uploads";
-    const directory = (config.directory || "").replace(/(^\/)|(\/$)/g, "");
-    const options = config.options || undefined;
+export const init = (config: Config) => {
+  const apiUrl = config.apiUrl;
+  const apiKey = config.apiKey;
 
-    const supabase = createClient(apiUrl, apiKey, options);
+  const bucket = config.bucket || "strapi-uploads";
+  const directory = (config.directory || "").replace(/(^\/)|(\/$)/g, "");
+  const options = config.options || undefined;
 
-    return {
-      upload: (file: TFile, customParams = {}) =>
-        new Promise((resolve, reject) => {
-          //--- Compute the file key.
-          file.hash = crypto.createHash("md5").update(file.hash).digest("hex");
-          //--- Upload the file into storage
-          supabase.storage
-            .from(bucket)
-            .upload(
-              getKey({ directory, file }),
-              // file, // or Buffer.from(file.buffer, "binary"),
-              Buffer.from(file.buffer, "binary"), // or file
-              {
-                cacheControl: "public, max-age=31536000, immutable",
-                upsert: true,
-                contentType: file.mime,
-              }
-            )
-            .then(({ data, error: error1 }) => {
-              if (error1) return reject(error1);
-              const { publicURL, error: error2 } = supabase.storage
-                .from(bucket)
-                .getPublicUrl(getKey({ directory, file }));
-              if (error2) return reject(error2);
-              file.url = publicURL;
-              resolve(undefined);
-            });
-        }),
+  const supabase = createClient(apiUrl, apiKey, options);
 
-      delete: (file: TFile, customParams = {}) =>
-        new Promise((resolve, reject) => {
-          //--- Delete the file fromstorage the space
-          supabase.storage
-            .from(bucket)
-            .remove([getKey({ directory, file })])
-            .then(({ data, error }) => {
-              if (error) return reject(error);
-              resolve(undefined);
-            });
-        }),
-    };
-  },
+  return {
+    upload: (file: TFile, customParams = {}) =>
+      new Promise((resolve, reject) => {
+        //--- Compute the file key.
+        file.hash = crypto.createHash("md5").update(file.hash).digest("hex");
+        //--- Upload the file into storage
+        supabase.storage
+          .from(bucket)
+          .upload(
+            getKey({ directory, file }),
+            // file, // or Buffer.from(file.buffer, "binary"),
+            Buffer.from(file.buffer, "binary"), // or file
+            {
+              cacheControl: "public, max-age=31536000, immutable",
+              upsert: true,
+              contentType: file.mime,
+            }
+          )
+          .then(({ data, error: error1 }) => {
+            if (error1) return reject(error1);
+            const { publicURL, error: error2 } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(getKey({ directory, file }));
+            if (error2) return reject(error2);
+            file.url = publicURL;
+            resolve(undefined);
+          });
+      }),
+
+    delete: (file: TFile, customParams = {}) =>
+      new Promise((resolve, reject) => {
+        //--- Delete the file fromstorage the space
+        supabase.storage
+          .from(bucket)
+          .remove([getKey({ directory, file })])
+          .then(({ data, error }) => {
+            if (error) return reject(error);
+            resolve(undefined);
+          });
+      }),
+  };
 };
