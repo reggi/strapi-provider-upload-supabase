@@ -49,7 +49,7 @@ const remove = (props: {supabase: SupabaseClient, config: Config}) => async (fil
   return undefined
 }
 
-const init = (config: Config) => {
+export const init = (config: Config) => {
   config.bucket = config.bucket || "strapi-uploads";
   config.directory = (config.directory || "").replace(/(^\/)|(\/$)/g, "");
   config.options = config.options || undefined;
@@ -60,7 +60,3 @@ const init = (config: Config) => {
     delete: remove({ supabase, config }),
   }
 };
-
-export default {
-  init
-}
