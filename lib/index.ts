@@ -1,112 +1,66 @@
-"use strict";
-import { createClient, SupabaseClientOptions } from "@supabase/supabase-js";
-import crypto from "node:crypto";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { File } from './types'
+import type { Config } from "./config";
 
-//
-//--- Types
-//
-type TFile = {
-  mime: string;
-  ext: string;
-  buffer: string;
-  hash: string;
-  name: string;
-  url: string | null;
-};
+const getKey = ({ directory, file }: { directory: string; file: File }) => {
+  return `${directory}/${file.name}-${file.hash}${file.ext}`.replace(/^\//g,"")
+}
 
-type Config = {
-  apiUrl: string;
-  apiKey: string;
-  bucket: string;
-  directory: string;
-  options: SupabaseClientOptions;
-};
+const upload = (props: {supabase: SupabaseClient, config: Config}) => async (file: File) => {
+  const { supabase, config } = props
+  const key = getKey({ directory: config.directory, file })
+  const cacheControl = "public, max-age=31536000, immutable"
+  const upsert = true
+  const contentType = file.mime
+  if (!file.buffer) throw new Error('Missing file buffer')
 
-//
-//--- Helpers
-//
-const getKey = ({ directory, file }: { directory: string; file: TFile }) => {
-  return `${directory}/${file.name}-${file.hash}${file.ext}`.replace(
-    /^\//g,
-    ""
-  );
-};
+  const { error: uploadError } = await supabase.storage
+    .from(config.bucket)
+    .upload(key, file.buffer, { cacheControl, upsert, contentType })
+  if (uploadError) throw uploadError
 
-const config = {
-  provider: "supabase",
-  name: "Supabase Storage",
-  auth: {
-    apiUrl: {
-      label:
-        "Supabase API Url (e.g. 'https://zokyprbhquvvrleedkkk.supabase.co')",
-      type: "text",
-    },
-    apiKey: {
-      label:
-        "Supabase API Key (e.g. 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpBNWJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6NOYyNjk1NzgzOCwiZXhwIjoxOTQUNTMzODM4fQ.tfr1M8tg6-ynD-qXkODRXX-do1qWNwQQUt1zQp8sFIc')",
-      type: "text",
-    },
-    bucket: {
-      label: "Supabase storage bucket (e.g. 'my-bucket')",
-      type: "text",
-    },
-    directory: {
-      label: "Directory inside Supabase storage bucket (e.g. '')",
-      type: "text",
-    },
-    options: {
-      label: "Supabase client additional options",
-      type: "object",
-    },
-  },
-};
+  const { publicURL, error: getUrlError } = await supabase.storage
+    .from(config.bucket)
+    .getPublicUrl(key)
+  if (getUrlError) throw getUrlError
+  if (!publicURL) throw new Error("Missing publicURL")
+  file.url = publicURL;
+  return undefined
+}
 
-export const init = (config: Config) => {
-  const apiUrl = config.apiUrl;
-  const apiKey = config.apiKey;
+const uploadStream = (props: {supabase: SupabaseClient, config: Config}) => (file: File) => new Promise((resolve, reject) => {
+  const { supabase, config } = props
+  const _buf: Buffer[] = [];
+  if (!file.stream) throw new Error('Missing file stream')
+  file.stream.on('data', (chunk: Buffer) => _buf.push(chunk));
+  file.stream.on('end', () => {
+    file.buffer = Buffer.concat(_buf);
+    upload({supabase, config})(file).then(() => resolve(undefined))
+  })
+  file.stream.on('error', err => reject(err));
+  return undefined
+})
 
-  const bucket = config.bucket || "strapi-uploads";
-  const directory = (config.directory || "").replace(/(^\/)|(\/$)/g, "");
-  const options = config.options || undefined;
+const remove = (props: {supabase: SupabaseClient, config: Config}) => async (file: File) => {
+  const { supabase, config } = props
+  const key = getKey({ directory: config.directory, file })
+  const { error } = await supabase.storage.from(config.bucket).remove([key])
+  if (error) throw error
+  return undefined
+}
 
-  const supabase = createClient(apiUrl, apiKey, options);
-
+const init = (config: Config) => {
+  config.bucket = config.bucket || "strapi-uploads";
+  config.directory = (config.directory || "").replace(/(^\/)|(\/$)/g, "");
+  config.options = config.options || undefined;
+  const supabase = createClient(config.apiUrl, config.apiKey, config.options);
   return {
-    upload: async (file: TFile, customParams = {}) => {
-      //--- Upload the file into storage
-      const { data, error: error1 } = await supabase.storage
-        .from(bucket)
-        .upload(
-          getKey({ directory, file }),
-          // file, // or Buffer.from(file.buffer, "binary"),
-          Buffer.from(file.buffer, "binary"), // or file
-          {
-            cacheControl: "public, max-age=31536000, immutable",
-            upsert: true,
-            contentType: file.mime,
-          }
-        );
-
-      if (error1) throw error1;
-
-      const { publicURL, error: error2 } = await supabase.storage
-        .from(bucket)
-        .getPublicUrl(getKey({ directory, file }));
-
-      if (error2) throw error2;
-      file.url = publicURL;
-    },
-
-    delete: (file: TFile, customParams = {}) =>
-      new Promise((resolve, reject) => {
-        //--- Delete the file fromstorage the space
-        supabase.storage
-          .from(bucket)
-          .remove([getKey({ directory, file })])
-          .then(({ data, error }) => {
-            if (error) return reject(error);
-            resolve(undefined);
-          });
-      }),
-  };
+    upload: upload({ supabase, config }),
+    uploadStream: uploadStream({ supabase, config }),
+    delete: remove({ supabase, config }),
+  }
 };
+
+export default {
+  init
+}
