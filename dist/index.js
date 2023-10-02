@@ -9,6 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.init = void 0;
 const supabase_js_1 = require("@supabase/supabase-js");
 const getKey = ({ directory, file }) => {
     return `${directory}/${file.name}-${file.hash}${file.ext}`.replace(/^\//g, "");
@@ -65,9 +66,7 @@ const init = (config) => {
     return {
         upload: upload({ supabase, config }),
         uploadStream: uploadStream({ supabase, config }),
-        delete: remove({ supabase, config }),
+        delete: remove({ supabase, config })
     };
 };
-exports.default = {
-    init
-};
+exports.init = init;

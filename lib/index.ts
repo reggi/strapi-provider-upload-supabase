@@ -57,6 +57,6 @@ export const init = (config: Config) => {
   return {
     upload: upload({ supabase, config }),
     uploadStream: uploadStream({ supabase, config }),
-    delete: remove({ supabase, config }),
+    delete: remove({ supabase, config })
   }
-};
+}
