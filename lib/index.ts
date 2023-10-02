@@ -28,18 +28,17 @@ const upload = (props: {supabase: SupabaseClient, config: Config}) => async (fil
   return undefined
 }
 
-const uploadStream = (props: {supabase: SupabaseClient, config: Config}) => (file: File) => new Promise((resolve, reject) => {
-  const { supabase, config } = props
+const uploadStream = (props: { supabase: SupabaseClient, config: Config }) => async (file: File) => {
+  if (!file.stream) throw new Error('Missing file stream');
+
   const _buf: Buffer[] = [];
-  if (!file.stream) throw new Error('Missing file stream')
-  file.stream.on('data', (chunk: Buffer) => _buf.push(chunk));
-  file.stream.on('end', () => {
-    file.buffer = Buffer.concat(_buf);
-    upload({supabase, config})(file).then(() => resolve(undefined))
-  })
-  file.stream.on('error', err => reject(err));
-  return undefined
-})
+  for await (const chunk of file.stream) {
+    _buf.push(chunk as Buffer);
+  }
+  file.buffer = Buffer.concat(_buf);
+
+  await upload({ supabase: props.supabase, config: props.config })(file);
+}
 
 const remove = (props: {supabase: SupabaseClient, config: Config}) => async (file: File) => {
   const { supabase, config } = props

@@ -8,6 +8,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __asyncValues = (this && this.__asyncValues) || function (o) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var m = o[Symbol.asyncIterator], i;
+    return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () { return this; }, i);
+    function verb(n) { i[n] = o[n] && function (v) { return new Promise(function (resolve, reject) { v = o[n](v), settle(resolve, reject, v.done, v.value); }); }; }
+    function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.init = void 0;
 const supabase_js_1 = require("@supabase/supabase-js");
@@ -37,18 +44,33 @@ const upload = (props) => (file) => __awaiter(void 0, void 0, void 0, function* 
     file.url = publicURL;
     return undefined;
 });
-const uploadStream = (props) => (file) => new Promise((resolve, reject) => {
-    const { supabase, config } = props;
-    const _buf = [];
+const uploadStream = (props) => (file) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, e_1, _b, _c;
     if (!file.stream)
         throw new Error('Missing file stream');
-    file.stream.on('data', (chunk) => _buf.push(chunk));
-    file.stream.on('end', () => {
-        file.buffer = Buffer.concat(_buf);
-        upload({ supabase, config })(file).then(() => resolve(undefined));
-    });
-    file.stream.on('error', err => reject(err));
-    return undefined;
+    const _buf = [];
+    try {
+        for (var _d = true, _e = __asyncValues(file.stream), _f; _f = yield _e.next(), _a = _f.done, !_a;) {
+            _c = _f.value;
+            _d = false;
+            try {
+                const chunk = _c;
+                _buf.push(chunk);
+            }
+            finally {
+                _d = true;
+            }
+        }
+    }
+    catch (e_1_1) { e_1 = { error: e_1_1 }; }
+    finally {
+        try {
+            if (!_d && !_a && (_b = _e.return)) yield _b.call(_e);
+        }
+        finally { if (e_1) throw e_1.error; }
+    }
+    file.buffer = Buffer.concat(_buf);
+    yield upload({ supabase: props.supabase, config: props.config })(file);
 });
 const remove = (props) => (file) => __awaiter(void 0, void 0, void 0, function* () {
     const { supabase, config } = props;
